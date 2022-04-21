@@ -8,8 +8,22 @@ This enables both event loop profiling that will list out all registered events.
 ## How to use example
 
 ### Hardware Required
-
 Any ESP32 family development board.
+
+### Apps Required
+Unless you develop your own app, it's faster to use existing "official" app from Espressif in order to do the provisioning.
+
+* **Android**:
+  * [BLE Provisioning app on Play Store](https://play.google.com/store/apps/details?id=com.espressif.provble)
+  * [SoftAP Provisioning app on Play Store](https://play.google.com/store/apps/details?id=com.espressif.provsoftap)
+
+* **iOS**:
+  * [BLE Provisioning app on app store](https://apps.apple.com/in/app/esp-ble-provisioning/id1473590141)
+  * [SoftAP Provisioning app on app Store](https://apps.apple.com/in/app/esp-softap-provisioning/id1474040630)
+
+If you do need to integrate provisioning functionity in your app, get the library here:
+* Source code on GitHub: [esp-idf-provisioning-android](https://github.com/espressif/esp-idf-provisioning-android)
+* Source code on GitHub: [esp-idf-provisioning-ios](https://github.com/espressif/esp-idf-provisioning-ios)
 
 ### Configure the project
 
