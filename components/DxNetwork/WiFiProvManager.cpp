@@ -504,6 +504,7 @@ GETOUT_OF_HERE:
                 if (_self->provisioned) {
                     // Notify event handler on success
                     _self->postEvent(DX_NET_EVENT_WIFI_PROV_SUCCESS);
+                    xEventGroupSetBits(dx_wifiprov_event_group, DX_WIFIPROV_CONNECTED_BIT);
                 }
             }
             else {
