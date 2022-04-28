@@ -12,6 +12,10 @@
 #include "nvs_flash.h"
 #include "WiFiProvManager.h"
 
+#include "APIClient.h"
+#include "secrets.h"
+#include "SensorManager.h"
+
 using namespace std;
 using namespace dx;
 using namespace network;
@@ -47,12 +51,17 @@ static void wifiProvEventHandler(const ESPEvent &event, void *event_data) {
     }
 }
 
+extern "C" {
+uint8_t temprature_sens_read();
+}
+
 extern "C" void app_main(void)
 {
     // Set logs verbosity level in runtime for some tags
     esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set("wifi", ESP_LOG_ERROR);
     esp_log_level_set("WIFIPROV", ESP_LOG_VERBOSE);
+    //esp_log_level_set("API", ESP_LOG_DEBUG);
 
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
@@ -69,14 +78,42 @@ extern "C" void app_main(void)
     // Set method to handle all events
     mgr->setHandler(wifiProvEventHandler);
     // Begin provsioning process. Note `forceReset` is set true so previous provisioning is cleared, for demo purpose
-    mgr->begin("Feeder_001", true);
-    //mgr->begin("Feeder_001");
+//    mgr->begin("Feeder_001", true);
+    mgr->begin("Feeder_001");
 
 
     // Wait indefinitely until WiFi Provisioning is successful.
     mgr->waitUntilConnected();
 
     // Code below won't be executed until WiFi Provisioning is successful.
-    ESP_LOGI(TAG, "All is good!");
+    ESP_LOGI(TAG, "All is good! Time to do HTTP request");
 
+
+    APIClientConfig_t _clCfg = {
+            API_ENDPOINT,
+            API_AUTH_STRING,
+            false
+    };
+
+    SensorManager sensorMgr;
+    sensorMgr.begin();
+
+    auto _apiClient = std::make_shared<APIClient>();
+    ESP_LOGI(TAG, "Beginning API Client");
+    auto _err = _apiClient->begin(_clCfg);
+    if (_err == ESP_OK) {
+        while (1) {
+            // Post
+            ESP_LOGI(TAG, "Posting measurement...");
+
+//            uint8_t temp = temprature_sens_read();
+//            float temp_celsius = (float) (temp - 32.0f) / 1.8f;
+
+            float temp_celsius = 0.0f;
+            sensorMgr.readCPUTemperature(&temp_celsius);
+            _apiClient->postTemperatureMeasurement(temp_celsius);
+
+            vTaskDelay(60000/portTICK_PERIOD_MS);
+        }
+    }
 }
