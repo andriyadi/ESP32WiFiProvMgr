@@ -117,6 +117,11 @@ namespace dx {
 
         esp_err_t WiFiProvManager::begin(const char *provDevName, bool forceReset) {
 
+            // Copy device name
+            if (provDevName != nullptr) {
+                provDeviceName_ = provDevName;
+            }
+
             esp_err_t ret = ESP_OK;
             wifi_prov_mgr_config_t _provCfg = {};
             wifi_init_config_t _wifiCfg = {};
@@ -201,12 +206,14 @@ namespace dx {
             /* Initialize provisioning manager with the
              * configuration parameters set above */
             ESP_ERROR_CHECK(wifi_prov_mgr_init(_provCfg));
+            wifiProvMgrInitted_ = true;
 
 #if CONFIG_DXNETWORK_RESET_PROVISIONED
             // Override
             bool _forceReset = CONFIG_DXNETWORK_RESET_PROVISIONED;
 #endif //CONFIG_DXNETWORK_RESET_PROVISIONED
 
+            // Reset or check if provisioned earlier
             if (forceReset) {
                 ESP_LOGI(TAG, "Resetting provisioning...");
                 wifi_prov_mgr_reset_provisioning();
@@ -233,6 +240,7 @@ namespace dx {
                 /* We don't need the manager as device is already provisioned,
                 * so let's release it's resources */
                 wifi_prov_mgr_deinit();
+                wifiProvMgrInitted_ = false;
 
                 /* Start Wi-Fi in station mode */
                 ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
@@ -260,6 +268,18 @@ GETOUT_OF_HERE:
             stop();
         }
 
+        esp_err_t WiFiProvManager::restart(const char *provDevName) {
+
+            // wifi_prov_mgr may be already deinited
+            if (!wifiProvMgrInitted_) {
+                auto _provCfg = createProvConfig();
+                ESP_ERROR_CHECK(wifi_prov_mgr_init(_provCfg));
+                wifiProvMgrInitted_ = true;
+            }
+
+            return start(provDevName);
+        }
+
         esp_err_t WiFiProvManager::start(const char *provDevName) {
 
             ESP_LOGI(TAG, "Starting provisioning");
@@ -271,7 +291,12 @@ GETOUT_OF_HERE:
              */
             char service_name[16];
             if (provDevName == nullptr) {
-                getDeviceServiceName(service_name, sizeof(service_name));
+                if (provDeviceName_.empty()) {
+                    getDeviceServiceName(service_name, sizeof(service_name));
+                }
+                else {
+                    snprintf(service_name, 16, "%s", provDeviceName_.c_str());
+                }
             }
             else {
                 snprintf(service_name, 16, "%s", provDevName);
@@ -465,7 +490,9 @@ GETOUT_OF_HERE:
                         ESP_LOGI(TAG, ">> Provisioning ended");
 
                         // De-initialize manager once provisioning is finished
-                        wifi_prov_mgr_deinit();
+                        //wifi_prov_mgr_deinit();
+                        _self->stop();
+
                         break;
                     default:
                         break;
@@ -486,6 +513,11 @@ GETOUT_OF_HERE:
 
                 // Notify event handler on failed
                 //_self->postEvent(DX_NET_EVENT_WIFI_PROV_FAILED, nullptr);
+
+                // If previously provisioned, then restart here
+                if (_self->provisioned) {
+                    _self->restart();
+                }
 
             } else if (_eventBase == IP_EVENT && _eventIdNum == IP_EVENT_STA_GOT_IP) {
                 auto* _ipData = (ip_event_got_ip_t*) event_data;
@@ -557,10 +589,12 @@ GETOUT_OF_HERE:
                                                                 &evHandlerDxProvId_));
 
             // Delete event loop as it's created by this class
-            esp_event_loop_delete_default();
+            //esp_event_loop_delete_default(); // Maybe don't delete, will be used by other
+
 #endif //CONFIG_DXNETWORK_USE_EVENT_API_CXX
 
             wifi_prov_mgr_deinit();
+            wifiProvMgrInitted_ = false;
         }
 
         bool WiFiProvManager::isProvisioned(bool recheck) {

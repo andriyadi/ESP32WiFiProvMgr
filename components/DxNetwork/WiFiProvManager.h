@@ -60,6 +60,7 @@ public:
 
     esp_err_t begin(const char *provDevName = nullptr, bool forceReset=false);
     esp_err_t start(const char *provDevName = nullptr);
+    esp_err_t restart(const char *provDevName = nullptr);
     void stop();
 
     void setHandler(std::function<void(const ESPEvent &, void*)> cb);
@@ -80,6 +81,9 @@ public:
                    T &event_data,
                    const std::chrono::milliseconds &wait_time=PLATFORM_MAX_DELAY_MS);
 private:
+
+    std::string provDeviceName_;
+    bool wifiProvMgrInitted_ = false;
 
 #if CONFIG_DXNETWORK_USE_EVENT_API_CXX
     std::shared_ptr<ESPEventLoop> defaultEventLoop_;
