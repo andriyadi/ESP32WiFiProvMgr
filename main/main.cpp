@@ -8,8 +8,9 @@
 #include <cstdlib>
 #include <thread>
 #include "esp_log.h"
-
 #include "nvs_flash.h"
+#include "mdns.h"
+
 #include "WiFiProvManager.h"
 
 #include "APIClient.h"
@@ -23,6 +24,30 @@ using namespace network;
 std::shared_ptr<dx::network::WiFiProvManager> mgr;
 
 constexpr auto *TAG = "APP";
+constexpr auto *DEVICE_NAME = "Feeder_001";
+
+static void initialise_mdns()
+{
+    //initialize mDNS
+    ESP_ERROR_CHECK( mdns_init() );
+    //set mDNS hostname (required if you want to advertise services)
+    ESP_ERROR_CHECK( mdns_hostname_set(DEVICE_NAME) );
+
+    ESP_LOGI(TAG, "Set hostname to: %s.local. Try to ping it!", DEVICE_NAME);
+
+    //set default instance
+    ESP_ERROR_CHECK( mdns_instance_name_set("An IoT Device") );
+
+    //structure with TXT records
+    mdns_txt_item_t serviceTxtData[3] = {
+            {"board", "esp32"},
+            {"u", "user"},
+            {"p", "password"}
+    };
+
+    //initialize service
+    ESP_ERROR_CHECK( mdns_service_add("ESP32-WebServer", "_http", "_tcp", 80, serviceTxtData, 3) );
+}
 
 static void wifiProvEventHandler(const ESPEvent &event, void *event_data) {
     if (event.base == DX_NET_EVENT && event.id == DX_NET_EVENT_ID_WIFI_PROV_SUCCESS) {
@@ -78,12 +103,14 @@ extern "C" void app_main(void)
     // Set method to handle all events
     mgr->setHandler(wifiProvEventHandler);
     // Begin provsioning process. Note `forceReset` is set true so previous provisioning is cleared, for demo purpose
-//    mgr->begin("Feeder_001", true);
+//    mgr->begin(DEVICE_NAME, true);
     mgr->begin("Feeder_001");
-
 
     // Wait indefinitely until WiFi Provisioning is successful.
     mgr->waitUntilConnected();
+
+    // Must be after mgr->begin, as event_loop already created
+    initialise_mdns();
 
     // Code below won't be executed until WiFi Provisioning is successful.
     ESP_LOGI(TAG, "All is good! Time to do HTTP request");
